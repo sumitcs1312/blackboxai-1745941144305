@@ -226,7 +226,7 @@
 
           const saveBtn = document.createElement('button');
           saveBtn.type = 'button';
-          saveBtn.className = 'text-green-600 hover:text-green-800 font-semibold';
+          saveBtn.className = 'bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md transition';
           saveBtn.textContent = 'Save';
 
           // Remove cancel button as per user request
@@ -313,19 +313,19 @@
         });
       }
 
-      // Handle login form submission
-      document.getElementById('login-form').addEventListener('submit', function(e) {
+      // Replace the login form submission handler with AWS Amplify Auth
+      document.getElementById('login-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         hideError();
         const username = e.target.username.value.trim();
         const password = e.target.password.value;
-        const users = JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-        const user = users.find(u => u.username === username && u.password === password);
-        console.log('Login attempt:', username, user ? 'Success' : 'Failure');
-        if (user) {
-          localStorage.setItem(LOGGED_IN_USER_KEY, username);
+        try {
+          const user = await Auth.signIn(username, password);
+          console.log('Login success:', user);
+          localStorage.setItem('cognitoUser', JSON.stringify(user));
           showCoursesPage(username);
-        } else {
+        } catch (error) {
+          console.error('Login error:', error);
           showError('Invalid username or password.');
         }
       });
@@ -398,6 +398,27 @@
         });
       }
     });
+
+    // Load AWS Amplify scripts and configure
+    const amplifyCoreScript = document.createElement('script');
+    amplifyCoreScript.src = 'https://unpkg.com/@aws-amplify/core@4.x/dist/aws-amplify-core.min.js';
+    amplifyCoreScript.onload = () => {
+      const amplifyAuthScript = document.createElement('script');
+      amplifyAuthScript.src = 'https://unpkg.com/@aws-amplify/auth@4.x/dist/aws-amplify-auth.min.js';
+      amplifyAuthScript.onload = () => {
+        const { Amplify, Auth } = window.aws_amplify_core;
+        Amplify.configure({
+          Auth: {
+            region: 'YOUR_AWS_REGION',
+            userPoolId: 'YOUR_USER_POOL_ID',
+            userPoolWebClientId: 'YOUR_USER_POOL_CLIENT_ID',
+          }
+        });
+        window.Auth = Auth; // expose Auth globally for login handler
+      };
+      document.head.appendChild(amplifyAuthScript);
+    };
+    document.head.appendChild(amplifyCoreScript);
   </script>
 </body>
 </html>
