@@ -50,8 +50,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: CourseTrackerPreSignUp
-      Handler: pre_signup.handler
-      Runtime: python3.9
+      Handler: index.handler
+      Runtime: nodejs18.x
       CodeUri: ./lambda/pre_signup/
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -60,8 +60,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: CourseTrackerPostConfirmation
-      Handler: post_confirmation.handler
-      Runtime: python3.9
+      Handler: index.handler
+      Runtime: nodejs18.x
       CodeUri: ./lambda/post_confirmation/
       Policies:
         - AWSLambdaBasicExecutionRole
