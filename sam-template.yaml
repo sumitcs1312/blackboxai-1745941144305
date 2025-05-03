@@ -51,17 +51,18 @@ Resources:
     Properties:
       FunctionName: CourseTrackerPreSignUp
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: node18.x
       CodeUri: ./lambda/pre_signup/
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSLambdaCognitoExecutionRole
 
   PostConfirmationFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: CourseTrackerPostConfirmation
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: node18.x
       CodeUri: ./lambda/post_confirmation/
       Policies:
         - AWSLambdaBasicExecutionRole
