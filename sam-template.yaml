@@ -51,7 +51,7 @@ Resources:
     Properties:
       FunctionName: CourseTrackerPreSignUp
       Handler: index.handler
-      Runtime: node18.x
+      Runtime: nodejs18.x
       CodeUri: ./lambda/pre_signup/
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -62,7 +62,7 @@ Resources:
     Properties:
       FunctionName: CourseTrackerPostConfirmation
       Handler: index.handler
-      Runtime: node18.x
+      Runtime: nodejs18.x
       CodeUri: ./lambda/post_confirmation/
       Policies:
         - AWSLambdaBasicExecutionRole
