@@ -50,6 +50,19 @@
       <button type="submit" class="w-full bg-green-600 text-white font-semibold py-2 rounded-md hover:bg-green-700 transition">Sign Up</button>
     </form>
     <p id="signup-error" class="text-red-600 mt-3 hidden text-center"></p>
+
+    <form id="confirm-signup-form" class="space-y-4 mt-6 hidden" autocomplete="off">
+      <div>
+        <label for="confirm-username" class="block text-gray-700 font-medium mb-1">Username</label>
+        <input type="text" id="confirm-username" name="confirm-username" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label for="confirmation-code" class="block text-gray-700 font-medium mb-1">Confirmation Code</label>
+        <input type="text" id="confirmation-code" name="confirmation-code" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <button type="submit" class="w-full bg-yellow-600 text-white font-semibold py-2 rounded-md hover:bg-yellow-700 transition">Confirm Signup</button>
+    </form>
+    <p id="confirm-error" class="text-red-600 mt-3 hidden text-center"></p>
   </div>
 
   <div id="courses-container" class="hidden w-full max-w-3xl bg-white rounded-lg shadow-md p-8">
@@ -91,58 +104,175 @@
   </div>
 
   <script>
-    window.addEventListener('load', () => {
-      console.log('Window load event fired');
-      // Sample user data stored in localStorage for demo purposes
-      const USERS_KEY = 'courseTrackerUsers';
-      const COURSES_KEY = 'courseTrackerCourses';
-      const LOGGED_IN_USER_KEY = 'courseTrackerLoggedInUser';
+    // Load AWS Amplify scripts and configure dynamically from app-config.json
+    fetch('app-config.json')
+      .then(response => response.json())
+      .then(config => {
+        const amplifyCoreScript = document.createElement('script');
+        amplifyCoreScript.src = 'https://unpkg.com/@aws-amplify/core@4.x/dist/aws-amplify-core.min.js';
+        amplifyCoreScript.onload = () => {
+          const amplifyAuthScript = document.createElement('script');
+          amplifyAuthScript.src = 'https://unpkg.com/@aws-amplify/auth@4.x/dist/aws-amplify-auth.min.js';
+          amplifyAuthScript.onload = () => {
+            const { Amplify } = window.aws_amplify_core;
+            Amplify.configure({
+              Auth: {
+                region: config.region,
+                userPoolId: config.userPoolId,
+                userPoolWebClientId: config.userPoolWebClientId,
+              }
+            });
+            window.Auth = window.aws_amplify_auth.Auth; // expose Auth globally for login handler
 
-      // Initialize sample data if not present
-      function initializeData() {
-        console.log('Initializing sample data');
-        if (!localStorage.getItem(USERS_KEY)) {
-          const users = [
-            { username: 'user1', password: 'password1' },
-            { username: 'user2', password: 'password2' }
-          ];
-          localStorage.setItem(USERS_KEY, JSON.stringify(users));
-          console.log('Sample users initialized');
-        }
-        if (!localStorage.getItem(COURSES_KEY)) {
-          const courses = {
-            user1: [
-              { name: 'Mathematics 101', completed: true, link: 'https://math101.example.com' },
-              { name: 'History 201', completed: false, link: 'https://history201.example.com' },
-              { name: 'Physics 301', completed: false, link: 'https://physics301.example.com' }
-            ],
-            user2: [
-              { name: 'Biology 101', completed: true, link: 'https://biology101.example.com' },
-              { name: 'Chemistry 201', completed: true, link: 'https://chemistry201.example.com' },
-              { name: 'Literature 301', completed: false, link: 'https://literature301.example.com' }
-            ]
+            // Attach event listeners after Amplify is loaded and configured
+            window.addEventListener('load', () => {
+              initializeData();
+
+              // Handle login form submission
+              document.getElementById('login-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                hideError();
+                const username = e.target.username.value.trim();
+                const password = e.target.password.value;
+                try {
+                  const user = await Auth.signIn(username, password);
+                  console.log('Login success:', user);
+                  if (user.challengeName === 'SMS_MFA' || user.challengeName === 'SOFTWARE_TOKEN_MFA') {
+                    // Handle MFA challenge if needed
+                  } else if (user.challengeName === 'NEW_PASSWORD_REQUIRED') {
+                    // Handle new password challenge if needed
+                  } else if (user.challengeName === 'CONFIRM_SIGN_UP') {
+                    // Show confirmation form
+                    document.getElementById('login-container').classList.add('hidden');
+                    document.getElementById('confirm-signup-form').classList.remove('hidden');
+                    document.getElementById('confirm-username').value = username;
+                  } else {
+                    localStorage.setItem(LOGGED_IN_USER_KEY, username);
+                    showCoursesPage(username);
+                  }
+                } catch (error) {
+                  console.error('Login error:', error);
+                  showError(error.message || 'Invalid username or password.');
+                }
+              });
+
+              // Show signup form when button clicked
+              document.getElementById('show-signup-btn').addEventListener('click', () => {
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('signup-form').classList.remove('hidden');
+                document.getElementById('login-error').classList.add('hidden');
+                document.getElementById('signup-error').classList.add('hidden');
+              });
+
+              // Handle signup form submission
+              document.getElementById('signup-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const username = e.target['signup-username'].value.trim();
+                const email = e.target['signup-email'].value.trim();
+                const password = e.target['signup-password'].value;
+                try {
+                  const { user } = await Auth.signUp({
+                    username,
+                    password,
+                    attributes: {
+                      email
+                    }
+                  });
+                  console.log('Signup success:', user);
+                  alert('Signup successful! Please check your email for verification.');
+                  // After signup, show confirmation form
+                  document.getElementById('signup-form').classList.add('hidden');
+                  document.getElementById('confirm-signup-form').classList.remove('hidden');
+                  document.getElementById('confirm-username').value = username;
+                } catch (error) {
+                  console.error('Signup error:', error);
+                  const signupErrorEl = document.getElementById('signup-error');
+                  signupErrorEl.textContent = error.message || 'Signup failed.';
+                  signupErrorEl.classList.remove('hidden');
+                }
+              });
+
+              // Handle confirmation form submission
+              document.getElementById('confirm-signup-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const username = e.target['confirm-username'].value.trim();
+                const code = e.target['confirmation-code'].value.trim();
+                try {
+                  await Auth.confirmSignUp(username, code);
+                  alert('Confirmation successful! You can now log in.');
+                  document.getElementById('confirm-signup-form').classList.add('hidden');
+                  document.getElementById('login-form').classList.remove('hidden');
+                } catch (error) {
+                  console.error('Confirmation error:', error);
+                  const confirmErrorEl = document.getElementById('confirm-error');
+                  confirmErrorEl.textContent = error.message || 'Confirmation failed.';
+                  confirmErrorEl.classList.remove('hidden');
+                }
+              });
+
+              // Show courses page and hide login
+              function showCoursesPage(username) {
+                console.log('Showing courses for user:', username);
+                document.getElementById('login-container').classList.add('hidden');
+                document.getElementById('courses-container').classList.remove('hidden');
+                renderCourses(username);
+              }
+
+              // Handle logout
+              document.getElementById('logout-btn').addEventListener('click', function() {
+                localStorage.removeItem(LOGGED_IN_USER_KEY);
+                document.getElementById('courses-container').classList.add('hidden');
+                document.getElementById('login-container').classList.remove('hidden');
+                document.getElementById('login-form').reset();
+                hideError();
+              });
+
+              // Handle add course form submission
+              document.getElementById('add-course-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                console.log('Add course form submitted');
+                hideAddCourseError();
+                const courseNameInput = document.getElementById('course-name');
+                const courseCompletedInput = document.getElementById('course-completed');
+                const courseName = courseNameInput.value.trim();
+                const courseCompleted = courseCompletedInput.checked;
+                const courseLinkInput = document.getElementById('course-link');
+                const courseLink = courseLinkInput.value.trim();
+                if (!courseName) {
+                  showAddCourseError('Course name cannot be empty.');
+                  return;
+                }
+                const username = localStorage.getItem(LOGGED_IN_USER_KEY);
+                if (!username) {
+                  showAddCourseError('User not logged in.');
+                  return;
+                }
+                const coursesData = JSON.parse(localStorage.getItem(COURSES_KEY)) || {};
+                if (!coursesData[username]) {
+                  coursesData[username] = [];
+                }
+                coursesData[username].push({ name: courseName, completed: courseCompleted, link: courseLink });
+                localStorage.setItem(COURSES_KEY, JSON.stringify(coursesData));
+                renderCourses(username);
+                courseNameInput.value = '';
+                courseLinkInput.value = '';
+                courseCompletedInput.checked = false;
+              });
+
+              // On page load, initialize data and check if user is logged in
+              const loggedInUser = localStorage.getItem(LOGGED_IN_USER_KEY);
+              console.log('Logged in user on load:', loggedInUser);
+              if (loggedInUser) {
+                showCoursesPage(loggedInUser);
+              }
+            });
           };
-          localStorage.setItem(COURSES_KEY, JSON.stringify(courses));
-          console.log('Sample courses initialized');
-        }
-      }
-+      initializeData();
-      // Handle login form submission
-      document.getElementById('login-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        hideError();
-        const username = e.target.username.value.trim();
-        const password = e.target.password.value;
-        const users = JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-        console.log('Login attempt:', username, users);
-        const user = users.find(u => u.username === username && u.password === password);
-        console.log('User found:', user);
-        if (user) {
-          localStorage.setItem(LOGGED_IN_USER_KEY, username);
-          showCoursesPage(username);
-        } else {
-          showError('Invalid username or password.');
-        }
+          document.head.appendChild(amplifyAuthScript);
+        };
+        document.head.appendChild(amplifyCoreScript);
+      })
+      .catch(error => {
+        console.error('Failed to load app config:', error);
       });
 
       // Show error message
@@ -333,155 +463,7 @@
           coursesListEl.appendChild(tr);
         });
       }
-
-    // Replace the login form submission handler with AWS Amplify Auth
-    document.getElementById('login-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      hideError();
-      const username = e.target.username.value.trim();
-      const password = e.target.password.value;
-      try {
-        const user = await Auth.signIn(username, password);
-        console.log('Login success:', user);
-        localStorage.setItem('cognitoUser', JSON.stringify(user));
-        showCoursesPage(username);
-      } catch (error) {
-        console.error('Login error:', error);
-        showError('Invalid username or password.');
-      }
-    });
-
-    // Show signup form when button clicked
-    document.getElementById('show-signup-btn').addEventListener('click', () => {
-      document.getElementById('login-form').classList.add('hidden');
-      document.getElementById('signup-form').classList.remove('hidden');
-      document.getElementById('login-error').classList.add('hidden');
-      document.getElementById('signup-error').classList.add('hidden');
-    });
-
-    // Handle signup form submission
-    document.getElementById('signup-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const username = e.target['signup-username'].value.trim();
-      const email = e.target['signup-email'].value.trim();
-      const password = e.target['signup-password'].value;
-      try {
-        const { user } = await Auth.signUp({
-          username,
-          password,
-          attributes: {
-            email
-          }
-        });
-        console.log('Signup success:', user);
-        alert('Signup successful! Please check your email for verification.');
-        // After signup, show login form again
-        document.getElementById('signup-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-      } catch (error) {
-        console.error('Signup error:', error);
-        const signupErrorEl = document.getElementById('signup-error');
-        signupErrorEl.textContent = error.message || 'Signup failed.';
-        signupErrorEl.classList.remove('hidden');
-      }
-    });
-
-      // Show courses page and hide login
-      function showCoursesPage(username) {
-        console.log('Showing courses for user:', username);
-        document.getElementById('login-container').classList.add('hidden');
-        document.getElementById('courses-container').classList.remove('hidden');
-        renderCourses(username);
-      }
-
-      // Handle logout
-      document.getElementById('logout-btn').addEventListener('click', function() {
-        localStorage.removeItem(LOGGED_IN_USER_KEY);
-        document.getElementById('courses-container').classList.add('hidden');
-        document.getElementById('login-container').classList.remove('hidden');
-        document.getElementById('login-form').reset();
-        hideError();
-      });
-
-      // Handle add course form submission
-      document.getElementById('add-course-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        console.log('Add course form submitted');
-        hideAddCourseError();
-        const courseNameInput = document.getElementById('course-name');
-        const courseCompletedInput = document.getElementById('course-completed');
-        const courseName = courseNameInput.value.trim();
-        const courseCompleted = courseCompletedInput.checked;
-        const courseLinkInput = document.getElementById('course-link');
-        const courseLink = courseLinkInput.value.trim();
-        if (!courseName) {
-          showAddCourseError('Course name cannot be empty.');
-          return;
-        }
-        const username = localStorage.getItem(LOGGED_IN_USER_KEY);
-        if (!username) {
-          showAddCourseError('User not logged in.');
-          return;
-        }
-        const coursesData = JSON.parse(localStorage.getItem(COURSES_KEY)) || {};
-        if (!coursesData[username]) {
-          coursesData[username] = [];
-        }
-        coursesData[username].push({ name: courseName, completed: courseCompleted, link: courseLink });
-        localStorage.setItem(COURSES_KEY, JSON.stringify(coursesData));
-        renderCourses(username);
-        courseNameInput.value = '';
-        courseLinkInput.value = '';
-        courseCompletedInput.checked = false;
-      });
-
-      // On page load, initialize data and check if user is logged in
-      window.addEventListener('load', () => {
-        initializeData();
-        const loggedInUser = localStorage.getItem(LOGGED_IN_USER_KEY);
-        console.log('Logged in user on load:', loggedInUser);
-        if (loggedInUser) {
-          showCoursesPage(loggedInUser);
-        }
-      });
-
-      // Register service worker for PWA
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('service-worker.js').catch(err => {
-            console.error('Service Worker registration failed:', err);
-          });
-        });
-      }
-    });
-
-    // Load AWS Amplify scripts and configure dynamically from app-config.json
-    fetch('app-config.json')
-      .then(response => response.json())
-      .then(config => {
-        const amplifyCoreScript = document.createElement('script');
-        amplifyCoreScript.src = 'https://unpkg.com/@aws-amplify/core@4.x/dist/aws-amplify-core.min.js';
-        amplifyCoreScript.onload = () => {
-          const amplifyAuthScript = document.createElement('script');
-          amplifyAuthScript.src = 'https://unpkg.com/@aws-amplify/auth@4.x/dist/aws-amplify-auth.min.js';
-          amplifyAuthScript.onload = () => {
-        const { Amplify } = window.aws_amplify_core;
-        Amplify.configure({
-          Auth: {
-            region: config.region,
-            userPoolId: config.userPoolId,
-            userPoolWebClientId: config.userPoolWebClientId,
-          }
-        });
-        window.Auth = window.aws_amplify_auth.Auth; // expose Auth globally for login handler
-          };
-          document.head.appendChild(amplifyAuthScript);
-        };
-        document.head.appendChild(amplifyCoreScript);
-      })
-      .catch(error => {
-        console.error('Failed to load app config:', error);
-      });
   </script>
 </body>
 </html>
+</create_file>
