@@ -465,15 +465,15 @@
           const amplifyAuthScript = document.createElement('script');
           amplifyAuthScript.src = 'https://unpkg.com/@aws-amplify/auth@4.x/dist/aws-amplify-auth.min.js';
           amplifyAuthScript.onload = () => {
-            const { Amplify, Auth } = window.aws_amplify_core;
-            Amplify.configure({
-              Auth: {
-                region: config.region,
-                userPoolId: config.userPoolId,
-                userPoolWebClientId: config.userPoolWebClientId,
-              }
-            });
-            window.Auth = Auth; // expose Auth globally for login handler
+        const { Amplify } = window.aws_amplify_core;
+        Amplify.configure({
+          Auth: {
+            region: config.region,
+            userPoolId: config.userPoolId,
+            userPoolWebClientId: config.userPoolWebClientId,
+          }
+        });
+        window.Auth = window.aws_amplify_auth.Auth; // expose Auth globally for login handler
           };
           document.head.appendChild(amplifyAuthScript);
         };
