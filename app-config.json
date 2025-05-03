@@ -1,5 +1,5 @@
 {
-  "region": "YOUR_AWS_REGION",
-  "userPoolId": "YOUR_USER_POOL_ID",
-  "userPoolWebClientId": "YOUR_USER_POOL_CLIENT_ID"
+  "region": "us-east-1",
+  "userPoolId": "us-east-1_W7Qq7B6qF",
+  "userPoolWebClientId": "66lu9b1jcorvce874imcgrhq9f"
 }
