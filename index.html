@@ -29,6 +29,27 @@
       <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition">Login</button>
     </form>
     <p id="login-error" class="text-red-600 mt-3 hidden text-center"></p>
+
+    <div class="mt-6 text-center">
+      <button id="show-signup-btn" class="text-indigo-600 hover:underline font-semibold">Don't have an account? Sign up</button>
+    </div>
+
+    <form id="signup-form" class="space-y-4 mt-6 hidden" autocomplete="off">
+      <div>
+        <label for="signup-username" class="block text-gray-700 font-medium mb-1">Username</label>
+        <input type="text" id="signup-username" name="signup-username" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label for="signup-email" class="block text-gray-700 font-medium mb-1">Email</label>
+        <input type="email" id="signup-email" name="signup-email" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label for="signup-password" class="block text-gray-700 font-medium mb-1">Password</label>
+        <input type="password" id="signup-password" name="signup-password" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <button type="submit" class="w-full bg-green-600 text-white font-semibold py-2 rounded-md hover:bg-green-700 transition">Sign Up</button>
+    </form>
+    <p id="signup-error" class="text-red-600 mt-3 hidden text-center"></p>
   </div>
 
   <div id="courses-container" class="hidden w-full max-w-3xl bg-white rounded-lg shadow-md p-8">
@@ -313,22 +334,57 @@
         });
       }
 
-      // Replace the login form submission handler with AWS Amplify Auth
-      document.getElementById('login-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        hideError();
-        const username = e.target.username.value.trim();
-        const password = e.target.password.value;
-        try {
-          const user = await Auth.signIn(username, password);
-          console.log('Login success:', user);
-          localStorage.setItem('cognitoUser', JSON.stringify(user));
-          showCoursesPage(username);
-        } catch (error) {
-          console.error('Login error:', error);
-          showError('Invalid username or password.');
-        }
-      });
+    // Replace the login form submission handler with AWS Amplify Auth
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      hideError();
+      const username = e.target.username.value.trim();
+      const password = e.target.password.value;
+      try {
+        const user = await Auth.signIn(username, password);
+        console.log('Login success:', user);
+        localStorage.setItem('cognitoUser', JSON.stringify(user));
+        showCoursesPage(username);
+      } catch (error) {
+        console.error('Login error:', error);
+        showError('Invalid username or password.');
+      }
+    });
+
+    // Show signup form when button clicked
+    document.getElementById('show-signup-btn').addEventListener('click', () => {
+      document.getElementById('login-form').classList.add('hidden');
+      document.getElementById('signup-form').classList.remove('hidden');
+      document.getElementById('login-error').classList.add('hidden');
+      document.getElementById('signup-error').classList.add('hidden');
+    });
+
+    // Handle signup form submission
+    document.getElementById('signup-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const username = e.target['signup-username'].value.trim();
+      const email = e.target['signup-email'].value.trim();
+      const password = e.target['signup-password'].value;
+      try {
+        const { user } = await Auth.signUp({
+          username,
+          password,
+          attributes: {
+            email
+          }
+        });
+        console.log('Signup success:', user);
+        alert('Signup successful! Please check your email for verification.');
+        // After signup, show login form again
+        document.getElementById('signup-form').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
+      } catch (error) {
+        console.error('Signup error:', error);
+        const signupErrorEl = document.getElementById('signup-error');
+        signupErrorEl.textContent = error.message || 'Signup failed.';
+        signupErrorEl.classList.remove('hidden');
+      }
+    });
 
       // Show courses page and hide login
       function showCoursesPage(username) {
@@ -399,26 +455,33 @@
       }
     });
 
-    // Load AWS Amplify scripts and configure
-    const amplifyCoreScript = document.createElement('script');
-    amplifyCoreScript.src = 'https://unpkg.com/@aws-amplify/core@4.x/dist/aws-amplify-core.min.js';
-    amplifyCoreScript.onload = () => {
-      const amplifyAuthScript = document.createElement('script');
-      amplifyAuthScript.src = 'https://unpkg.com/@aws-amplify/auth@4.x/dist/aws-amplify-auth.min.js';
-      amplifyAuthScript.onload = () => {
-        const { Amplify, Auth } = window.aws_amplify_core;
-        Amplify.configure({
-          Auth: {
-            region: 'YOUR_AWS_REGION',
-            userPoolId: 'YOUR_USER_POOL_ID',
-            userPoolWebClientId: 'YOUR_USER_POOL_CLIENT_ID',
-          }
-        });
-        window.Auth = Auth; // expose Auth globally for login handler
-      };
-      document.head.appendChild(amplifyAuthScript);
-    };
-    document.head.appendChild(amplifyCoreScript);
+    // Load AWS Amplify scripts and configure dynamically from app-config.json
+    fetch('app-config.json')
+      .then(response => response.json())
+      .then(config => {
+        const amplifyCoreScript = document.createElement('script');
+        amplifyCoreScript.src = 'https://unpkg.com/@aws-amplify/core@4.x/dist/aws-amplify-core.min.js';
+        amplifyCoreScript.onload = () => {
+          const amplifyAuthScript = document.createElement('script');
+          amplifyAuthScript.src = 'https://unpkg.com/@aws-amplify/auth@4.x/dist/aws-amplify-auth.min.js';
+          amplifyAuthScript.onload = () => {
+            const { Amplify, Auth } = window.aws_amplify_core;
+            Amplify.configure({
+              Auth: {
+                region: config.region,
+                userPoolId: config.userPoolId,
+                userPoolWebClientId: config.userPoolWebClientId,
+              }
+            });
+            window.Auth = Auth; // expose Auth globally for login handler
+          };
+          document.head.appendChild(amplifyAuthScript);
+        };
+        document.head.appendChild(amplifyCoreScript);
+      })
+      .catch(error => {
+        console.error('Failed to load app config:', error);
+      });
   </script>
 </body>
 </html>
